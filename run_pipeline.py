@@ -4,15 +4,14 @@ Usage:
     python run_pipeline.py
 """
 
-from src.data import load_data, save_raw_snapshot, clean_data, random_split, chronological_split
+from src.data import load_data, clean_data, random_split, chronological_split
 from src.model import get_models
 from src.evaluate import evaluate, save_results
 
 
 def main():
-    X, y = load_data()
-    save_raw_snapshot(X, y)
-    X, y = clean_data(X, y)
+    load_data()
+    X, y = clean_data()
 
     results = {}
     for split_name, split_fn in [("random", random_split), ("chronological", chronological_split)]:
