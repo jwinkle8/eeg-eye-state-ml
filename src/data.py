@@ -2,36 +2,47 @@
 
 import pandas as pd
 
+from pathlib import Path
+from sklearn.datasets import fetch_openml
+from sklearn.utils import Bunch
+
 RANDOM_STATE = 42
+RAW_DATA_PATH = Path("data/raw/eeg_eye_state.parquet")
 
-
-def load_data() -> tuple[pd.DataFrame, pd.Series]:
-    """Download the EEG Eye State dataset from OpenML.
-
-    Returns:
-        X: 14 EEG channel readings per sample.
-        y: eye state label (0 = open, 1 = closed).
+def load_data():
+    """Ensure the raw snapshot exists (fetch from OpenML), then print a quick inspection.
     """
-    # TODO: fetch with sklearn.datasets.fetch_openml(data_id=1471, as_frame=True)
-    # TODO: inspect column names and label values before mapping them
-    raise NotImplementedError
+    if RAW_DATA_PATH.exists():
+        print("Using cached dataset...")
+    else:
+        save_raw_snapshot(fetch_openml(data_id=1471, as_frame=True))
 
+    eeg_data_bunch = pd.read_parquet(RAW_DATA_PATH)
+    print("Load Data")
+    print("---------")
+    print()
+    print(eeg_data_bunch.shape)
+    print(eeg_data_bunch.dtypes)
+    print(eeg_data_bunch["Class"].value_counts())
 
-def save_raw_snapshot(X: pd.DataFrame, y: pd.Series, path: str = "data/raw/eeg_eye_state.parquet") -> None:
+def save_raw_snapshot(eeg_data_bunch: Bunch) -> None:
     """Save the untouched download to Parquet before any cleaning.
 
     Keeps a versioned copy of exactly what was trained on, so results can be
     reproduced even if the source changes or goes offline.
     """
-    # TODO: combine X and y into one DataFrame and write with df.to_parquet(path)
-    raise NotImplementedError
+    df = eeg_data_bunch.frame
+
+    RAW_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(RAW_DATA_PATH, engine="pyarrow", compression="snappy")
 
 
-def clean_data(X: pd.DataFrame, y: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
+def clean_data() -> tuple[pd.DataFrame, pd.Series]:
     """Basic cleaning.
 
     The raw recording has a few extreme spikes (sensor artifacts).
     """
+    # TODO: read from "data/raw/eeg_eye_state.parquet"
     # TODO: check for missing values
     # TODO: decide how to handle outliers (drop, clip, or leave in) and note it in README
     raise NotImplementedError
