@@ -28,18 +28,20 @@ Because the bounds were picked by looking at the whole dataset, including rows t
 ## How to run
 ```bash
 pip install -r requirements.txt
-python run_pipeline.py
+python run_pipeline.py                        # random split (final results)
+python run_pipeline.py --split chronological  # reproduces the earlier chronological results
 ```
-The pipeline writes three files:
+The pipeline writes these files:
 - `data/raw/eeg_eye_state.parquet`: the untouched download (only fetched if missing)
 - `data/clean/eeg_eye_state_clean.parquet`: the cleaned data the model trains on
-- `results/metrics.json`: cleaning details, split sizes and class balance, and validation/test metrics
+- `results/metrics.json`: random split. Cleaning details, split sizes and class balance, validation/test metrics for seed 86, and a summary over seeds 0–29 (`seed_sweep`)
+- `results/metrics_chronological.json`: the same for the chronological split (written only with `--split chronological`)
 
 ## Pipeline
 1. **Load:** fetch from OpenML
 2. **Snapshot:** save the untouched data to Parquet so the exact training data is versioned with the code
 3. **Clean:** assert the expected shape (14,980 × 15) and no missing values, rename columns to electrode names, map labels to 0 = open / 1 = closed, and drop 4 artifact rows (see [Outlier removal](#outlier-removal))
-4. **Split:** random 60/20/20 train/validation/test, stratified by class (`random_state=86`). Each part is 55.1% open / 44.9% closed.
+4. **Split:** random 60/20/20 train/validation/test, stratified by class (`random_state=86`). Each part is 55.1% open / 44.9% closed. The split and model are also repeated with seeds 0–29 to measure how much the scores depend on the seed.
 5. **Train:** logistic regression with `class_weight="balanced"`, with standardization inside a scikit-learn Pipeline so the scaler is fit on training rows only
 6. **Evaluate:** accuracy, macro F1, and confusion matrix on validation, then once on test
 
@@ -52,17 +54,34 @@ The pipeline writes three files:
 
 "Majority-class share" is the accuracy of always predicting the most common class (open), the baseline the model has to beat. 1 = closed is the positive class in the confusion matrix.
 
+### Seed robustness
+
+Validation and test are both random samples of the same recording, yet with seed 86 they differ by 5.4 points (0.599 vs. 0.653). To check whether that gap is real, I repeated the split and model with seeds 0–29:
+
+| Part | Accuracy (mean ± SD) | Macro F1 (mean ± SD) |
+|---|---|---|
+| Validation | 0.625 ± 0.009 | 0.623 ± 0.009 |
+| Test | 0.629 ± 0.009 | 0.627 ± 0.009 |
+
+Across those 30 seeds, the largest gap between validation and test accuracy is 0.031, smaller than seed 86's 0.054. Seed 86 happened to give an unusually low validation score and an unusually high test score. A fairer estimate of this model on this split is about **0.63 ± 0.01** accuracy. (Seed 86 was fixed before switching to the random split, not chosen for its score.)
+
 ### Choices made along the way
 - **Class weights:** with an earlier chronological split, `class_weight="balanced"` raised validation macro F1 from 0.263 to 0.306 over default weights, so I kept it. It was not re-compared on the random split, where the classes are nearly balanced.
-- **Split:** I first tried a chronological split (first 60% train, next 20% validation, last 20% test). Class balance shifted across the recording (train 61% closed, test 91% open), and the model scored below the majority-class baseline (test accuracy 0.237, macro F1 0.235 vs. a 0.906 baseline). I switched to the random split. Those chronological numbers come from an earlier version of this pipeline, not from the current `metrics.json`.
+- **Split:** I first tried a chronological split (first 60% train, next 20% validation, last 20% test). Class balance shifted across the recording (train 61% closed, test 91% open), and the model scored below the majority-class baseline on both validation (accuracy 0.341 vs. 0.684) and test (accuracy 0.237, macro F1 0.235 vs. 0.906). Run `python run_pipeline.py --split chronological` to reproduce these numbers.
+- **I switched splits after seeing the test score, which was a mistake.** Every chronological run also scored the test set, and its poor test result was part of why I switched. That contaminates the test set: it influenced a modeling decision, so it is no longer a fully untouched check. The decision should have rested on validation alone, but I was not aware that the coding assistant had already run against the test set. 
 
 ## Takeaways
-I started with a chronological split because the rows are a time series: shuffling them drops their order and lets near-identical neighboring samples land in both train and test, so keeping the order seemed like the more honest test of prediction. The results were poor. On test the model reached 0.237 accuracy and 0.235 macro F1, far below the 0.906 majority-class baseline, and it predicted "closed" for most rows even with balanced class weights. Eye state is not spread evenly through the recording (train was 61% closed while test was 91% open), and that class imbalance between segments was detrimental to training the model.
+I started with a chronological split because the rows are a time series: shuffling them drops their order and lets near-identical neighboring samples land in both train and test, so keeping the order seemed like the more honest test of prediction. The results were poor. On validation the model reached 0.341 accuracy against a 0.684 majority-class baseline (test: 0.237 against 0.906), and it predicted "closed" for most rows even with balanced class weights.
 
-With the random stratified split, every part has the same 55/45 balance, and the model beats the baseline: 0.653 test accuracy and 0.651 macro F1 against 0.551. That gain comes with the leakage described under Limitations, so these scores are an upper bound for this recording rather than evidence that the model would work on new data.
+Two explanations fit this result, and I can't separate them with this data:
+- **Class balance shifts across the recording.** Eye state is not spread evenly in time (train was 61% closed while test was 91% open), so the model trains on a very different mix of classes than it is tested on.
+- **The inputs drift over time.** The readings carry a slowly drifting baseline offset (see the data card), so the same eye state can look different later in the recording (data drift: P(X) changes). Balanced class weights already offset how common each class is in training, yet the model still called most of the mostly-open test rows "closed", which fits drift.
+
+With the random stratified split, every part has the same 55/45 balance, and the model beats the 0.551 baseline: about 0.63 ± 0.01 accuracy across 30 seeds (0.653 test accuracy with seed 86). That gain comes with the leakage described under Limitations, so these scores are an upper bound for this recording rather than evidence that the model would work on new data.
 
 ## Limitations
 - **The random split leaks across time.** Rows are sampled at ~128 Hz, so most test rows have a near-identical neighbor (~8 ms apart) in the training set. The scores above are an optimistic upper bound for this one recording, not an estimate of performance on new recordings or new people.
+- **The test set influenced the split choice.** See "Choices made along the way": I saw chronological test scores before switching splits.
 - **One subject, one session.** The whole dataset is a single ~117-second recording, so results may not generalize beyond it.
 
 ## Next steps

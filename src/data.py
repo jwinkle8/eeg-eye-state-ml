@@ -108,7 +108,8 @@ def clean_data() -> tuple[pd.DataFrame, pd.Series, dict]:
     return X, y, cleaning_info
 
 
-def random_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
+def random_split(X, y, val_size: float = 0.2, test_size: float = 0.2,
+                 random_state: int = RANDOM_STATE, verbose: bool = True):
     """60/20/20 train/validation/test split, shuffled and stratified by class.
 
     Caveat: the rows are a ~128 Hz time series, so most test rows have a
@@ -120,7 +121,7 @@ def random_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
     """
     # Step 1: hold out the test set
     X_temp, X_test, y_temp, y_test = train_test_split(
-        X, y, test_size=test_size, stratify=y, random_state=RANDOM_STATE
+        X, y, test_size=test_size, stratify=y, random_state=random_state
     )
     # Step 2: split the remainder; val fraction is relative to what's left
     # (0.2 / 0.8 = 0.25 of the remainder = 20% of the total)
@@ -128,23 +129,70 @@ def random_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
         X_temp, y_temp,
         test_size=val_size / (1 - test_size),
         stratify=y_temp,
-        random_state=RANDOM_STATE,
+        random_state=random_state,
     )
 
     assert len(X_train) + len(X_val) + len(X_test) == len(X)
 
-    # Record size and class balance of each part (printed and saved to metrics.json)
-    print()
-    print("Random split")
-    print("------------")
-    split_info = {"random_state": RANDOM_STATE}
+    split_info = {"type": "random", "random_state": random_state}
+    split_info.update(_describe_split(
+        "Random split", y_train, y_val, y_test, contiguous=False, verbose=verbose
+    ))
+    return X_train, X_val, X_test, y_train, y_val, y_test, split_info
+
+
+def chronological_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
+    """60/20/20 train/validation/test split by position in the recording.
+
+    Kept so the earlier chronological results can be reproduced
+    (`python run_pipeline.py --split chronological`).
+
+    Returns:
+        X_train, X_val, X_test, y_train, y_val, y_test, split_info
+    """
+    n = len(X)
+    train_end = int(n * (1 - val_size - test_size))  # end of first 60%
+    val_end = int(n * (1 - test_size))               # end of first 80%
+
+    # .iloc[a:b] excludes b, so the three slices touch but never overlap
+    X_train, y_train = X.iloc[:train_end], y.iloc[:train_end]
+    X_val, y_val = X.iloc[train_end:val_end], y.iloc[train_end:val_end]
+    X_test, y_test = X.iloc[val_end:], y.iloc[val_end:]
+
+    assert len(X_train) + len(X_val) + len(X_test) == n
+    assert min(len(X_train), len(X_val), len(X_test)) > 0
+
+    split_info = {"type": "chronological"}
+    split_info.update(_describe_split(
+        "Chronological split", y_train, y_val, y_test, contiguous=True
+    ))
+    return X_train, X_val, X_test, y_train, y_val, y_test, split_info
+
+
+def _describe_split(title: str, y_train, y_val, y_test,
+                    contiguous: bool, verbose: bool = True) -> dict:
+    """Return (and optionally print) the size and class balance of each part.
+
+    Row ranges are only meaningful for the contiguous (chronological) split.
+    Row positions refer to the cleaned data (after outlier rows were dropped).
+    """
+    if verbose:
+        print()
+        print(title)
+        print("-" * len(title))
+    info = {}
     for name, part in [("train", y_train), ("val", y_val), ("test", y_test)]:
         balance = part.value_counts(normalize=True)
-        split_info[name] = {
-            "n_rows": len(part),
-            # Cast numpy keys/values to plain int/float so json.dump accepts them
-            "class_balance": {int(k): float(v) for k, v in balance.items()},
-        }
-        print(f"{name}: {len(part)} rows, class balance {balance.round(3).to_dict()}")
+        part_info = {"n_rows": len(part)}
+        if contiguous:
+            part_info["first_row"] = int(part.index[0])
+            part_info["last_row"] = int(part.index[-1])
+        # Cast numpy keys/values to plain int/float so json.dump accepts them
+        part_info["class_balance"] = {int(k): float(v) for k, v in balance.items()}
+        info[name] = part_info
 
-    return X_train, X_val, X_test, y_train, y_val, y_test, split_info
+        if verbose:
+            rows = f"rows {part.index[0]}-{part.index[-1]}, " if contiguous else ""
+            print(f"{name}: {rows}{len(part)} rows, "
+                  f"class balance {balance.round(3).to_dict()}")
+    return info
