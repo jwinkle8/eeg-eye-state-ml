@@ -4,8 +4,8 @@ Usage:
     python run_pipeline.py
 """
 
-from src.data import load_data, clean_data, random_split, chronological_split
-from src.model import get_models
+from src.data import load_data, clean_data, chronological_split
+from src.model import build_model
 from src.evaluate import evaluate, save_results
 
 
@@ -13,13 +13,18 @@ def main():
     load_data()
     X, y, cleaning_info = clean_data()
 
-    results = {}
-    for split_name, split_fn in [("random", random_split), ("chronological", chronological_split)]:
-        X_train, X_test, y_train, y_test = split_fn(X, y)
-        for model_name, model in get_models().items():
-            model.fit(X_train, y_train)
-            results[f"{split_name}/{model_name}"] = evaluate(model, X_test, y_test)
-            print(split_name, model_name, results[f"{split_name}/{model_name}"])
+    X_train, X_val, X_test, y_train, y_val, y_test = chronological_split(X, y)
+
+    model = build_model()
+    model.fit(X_train, y_train)
+
+    results = {
+        "cleaning": cleaning_info,
+        "validation": evaluate(model, X_val, y_val),
+        "test": evaluate(model, X_test, y_test),
+    }
+    print("validation", results["validation"])
+    print("test", results["test"])
 
     save_results(results)
 
