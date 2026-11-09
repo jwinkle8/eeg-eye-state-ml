@@ -15,5 +15,9 @@ def build_model() -> Pipeline:
     """
     return Pipeline([
         ("scaler", StandardScaler()),
-        ("logreg", LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)),
+        # class_weight="balanced": train is ~61% closed / 39% open; reweight so
+        # neither class dominates the loss just by being more frequent
+        ("logreg", LogisticRegression(
+            max_iter=1000, class_weight="balanced", random_state=RANDOM_STATE
+        )),
     ])
