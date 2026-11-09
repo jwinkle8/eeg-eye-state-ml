@@ -114,7 +114,23 @@ def chronological_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
     Returns:
         X_train, X_val, X_test, y_train, y_val, y_test
     """
-    # TODO: compute the two cut points from len(X), val_size, and test_size,
-    #       then slice X and y with .iloc (no shuffling, no stratify).
-    #       Print the class balance of each part (y_part.value_counts(normalize=True)).
-    raise NotImplementedError
+    n = len(X)
+    train_end = int(n * (1 - val_size - test_size))  # end of first 60%
+    val_end = int(n * (1 - test_size))               # end of first 80%
+
+    # .iloc[a:b] excludes b, so the three slices touch but never overlap
+    X_train, y_train = X.iloc[:train_end], y.iloc[:train_end]
+    X_val, y_val = X.iloc[train_end:val_end], y.iloc[train_end:val_end]
+    X_test, y_test = X.iloc[val_end:], y.iloc[val_end:]
+
+    assert len(X_train) + len(X_val) + len(X_test) == n
+    assert min(len(X_train), len(X_val), len(X_test)) > 0
+
+    print()
+    print("Chronological split")
+    print("-------------------")
+    for name, part in [("train", y_train), ("val", y_val), ("test", y_test)]:
+        print(f"{name}: rows {part.index[0]}-{part.index[-1]} ({len(part)} rows), "
+              f"class balance {part.value_counts(normalize=True).round(3).to_dict()}")
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
