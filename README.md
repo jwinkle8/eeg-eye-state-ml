@@ -8,6 +8,10 @@ Predict whether a person's eyes are open or closed from 14-channel EEG readings.
 - **Target:** eye state (open / closed)
 - **Access:** downloaded at runtime with `sklearn.datasets.fetch_openml`, so no manual download is needed
 
+### Outlier removal
+
+Raw Emotiv values carry a DC offset of ~4,100–4,200 µV that drifts slowly (Emotiv). Scalp EEG is typically 10–100 µV, and the largest normal artifacts (eye blinks and closures, strongest at frontal electrodes) reach several hundred µV (Behavior Research Methods paper on eye artifacts; COGS 179 lecture notes). I dropped any row with a channel outside [2,000, 6,500] µV. That is the offset ± ~2,000 µV, several times larger than any normal signal and well within the headset’s ~8,400 µV hardware range. This removed N rows, consistent with the 3 outliers reported in prior work (arXiv 2209.01023). The thresholds come from domain knowledge rather than data statistics, so no test-set information leaks into training.
+
 ## How to run
 ```bash
 pip install -r requirements.txt
