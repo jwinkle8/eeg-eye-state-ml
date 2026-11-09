@@ -1,15 +1,19 @@
-"""Model definitions."""
+"""Model definition."""
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 RANDOM_STATE = 42
 
 
-def get_models() -> dict:
-    """Return the models to compare, keyed by name.
+def build_model() -> Pipeline:
+    """Standardize the channels, then fit logistic regression.
 
-    Suggested:
-        - baseline: DummyClassifier(strategy="most_frequent")
-        - logistic_regression: StandardScaler + LogisticRegression in a sklearn Pipeline
-        - random_forest: RandomForestClassifier(random_state=RANDOM_STATE)
+    The scaler lives inside the Pipeline, so it learns its mean and std
+    from the training rows only when the pipeline is fit.
     """
-    # TODO
-    raise NotImplementedError
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("logreg", LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)),
+    ])

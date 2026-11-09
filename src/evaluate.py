@@ -1,10 +1,11 @@
 """Evaluation helpers."""
 
 
-def evaluate(model, X_test, y_test) -> dict:
-    """Return test-set metrics for a fitted model.
+def evaluate(model, X, y) -> dict:
+    """Return metrics for a fitted model on one split (validation or test).
 
-    Suggested metrics: accuracy, F1, confusion matrix.
+    Suggested metrics: accuracy, macro F1, confusion matrix.
+    Convert numpy values to plain floats/lists so the dict is JSON-serializable.
     """
     # TODO
     raise NotImplementedError

@@ -6,7 +6,6 @@ from pathlib import Path
 from sklearn.datasets import fetch_openml
 from sklearn.utils import Bunch
 
-RANDOM_STATE = 42
 RAW_DATA_PATH = Path("data/raw/eeg_eye_state.parquet")
 CLEAN_DATA_PATH = Path("data/clean/eeg_eye_state_clean.parquet")
 
@@ -72,10 +71,11 @@ def clean_data() -> tuple[pd.DataFrame, pd.Series, dict]:
     assert eeg_data_df["Class"].isna().sum() == 0  # fails if an unexpected label appears
 
     # Outlier detection
-    # Look at the spread first, then choose the 
+    # Upper and lower outlier thresholds were chosen by reviewing the spread of the data
     print("Channel summary statistics")
     print(eeg_data_df[new_channel_names].agg(["min", "median", "max"]).T)
 
+    # Flag observations outside the chosen outlier range
     channels = eeg_data_df[new_channel_names]
     is_outlier = (
         (channels <= OUTLIER_LOWER_THRESHOLD) | (channels > OUTLIER_UPPER_THRESHOLD)
@@ -83,6 +83,7 @@ def clean_data() -> tuple[pd.DataFrame, pd.Series, dict]:
     flagged = eeg_data_df.index[is_outlier]
     print(f"{len(flagged)} rows outside plausibility range of [{OUTLIER_LOWER_THRESHOLD}, {OUTLIER_UPPER_THRESHOLD}]")
 
+    
     n_rows = len(eeg_data_df)
     cleaning_info = {
         "rows_before": n_rows,
@@ -104,17 +105,16 @@ def clean_data() -> tuple[pd.DataFrame, pd.Series, dict]:
     return X, y, cleaning_info
 
 
-def random_split(X, y, test_size: float = 0.2):
-    """Shuffled, stratified train/test split."""
-    # TODO: sklearn.model_selection.train_test_split(..., stratify=y, random_state=RANDOM_STATE)
-    raise NotImplementedError
-
-
-def chronological_split(X, y, test_size: float = 0.2):
-    """Train on the first part of the recording, test on the last part.
+def chronological_split(X, y, val_size: float = 0.2, test_size: float = 0.2):
+    """60/20/20 train/validation/test split by position in the recording.
 
     The samples are a time series, so neighboring rows are nearly identical.
-    A shuffled split leaks information; this split does not.
+    A shuffled split leaks information; slicing in time order does not.
+
+    Returns:
+        X_train, X_val, X_test, y_train, y_val, y_test
     """
-    # TODO: slice by row position (no shuffling)
+    # TODO: compute the two cut points from len(X), val_size, and test_size,
+    #       then slice X and y with .iloc (no shuffling, no stratify).
+    #       Print the class balance of each part (y_part.value_counts(normalize=True)).
     raise NotImplementedError
