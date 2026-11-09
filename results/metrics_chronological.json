@@ -1,0 +1,77 @@
+{
+  "cleaning": {
+    "rows_before": 14980,
+    "outlier_upper_threshold": 6500,
+    "outlier_lower_threshold": 2000,
+    "dropped_row_indices": [
+      898,
+      10386,
+      11509,
+      13179
+    ],
+    "rows_dropped": 4,
+    "rows_after": 14976
+  },
+  "split": {
+    "type": "chronological",
+    "train": {
+      "n_rows": 8985,
+      "first_row": 0,
+      "last_row": 8984,
+      "class_balance": {
+        "1": 0.6116861435726211,
+        "0": 0.388313856427379
+      }
+    },
+    "val": {
+      "n_rows": 2995,
+      "first_row": 8985,
+      "last_row": 11979,
+      "class_balance": {
+        "0": 0.6844741235392321,
+        "1": 0.31552587646076796
+      }
+    },
+    "test": {
+      "n_rows": 2996,
+      "first_row": 11980,
+      "last_row": 14975,
+      "class_balance": {
+        "0": 0.9062082777036048,
+        "1": 0.0937917222963952
+      }
+    }
+  },
+  "validation": {
+    "n_rows": 2995,
+    "accuracy": 0.34056761268781305,
+    "macro_f1": 0.30560944191548667,
+    "confusion_matrix": [
+      [
+        174,
+        1876
+      ],
+      [
+        99,
+        846
+      ]
+    ],
+    "majority_class_share": 0.6844741235392321
+  },
+  "test": {
+    "n_rows": 2996,
+    "accuracy": 0.23731642189586113,
+    "macro_f1": 0.23458417538063336,
+    "confusion_matrix": [
+      [
+        445,
+        2270
+      ],
+      [
+        15,
+        266
+      ]
+    ],
+    "majority_class_share": 0.9062082777036048
+  }
+}

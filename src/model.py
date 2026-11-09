@@ -15,8 +15,10 @@ def build_model() -> Pipeline:
     """
     return Pipeline([
         ("scaler", StandardScaler()),
-        # class_weight="balanced": train is ~61% closed / 39% open; reweight so
-        # neither class dominates the loss just by being more frequent
+        # class_weight="balanced": weight each class inversely to its frequency in
+        # train, so neither dominates the loss just by being more common. Chosen on
+        # the chronological split's validation set; on the random split the
+        # classes are ~55% open / 45% closed, so the reweighting is mild.
         ("logreg", LogisticRegression(
             max_iter=1000, class_weight="balanced", random_state=RANDOM_STATE
         )),
