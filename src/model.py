@@ -4,7 +4,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-RANDOM_STATE = 42
+RANDOM_STATE = 86
 
 
 def build_model() -> Pipeline:
